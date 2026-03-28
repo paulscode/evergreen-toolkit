@@ -1,0 +1,14 @@
+[
+  {
+    "_comment": "EXAMPLE — delete this entry and add real facts",
+    "id": "abc12345",
+    "fact": "User prefers direct, concise answers",
+    "category": "preference",
+    "source": "migration",
+    "confidence": 0.9,
+    "supersedes": null,
+    "added": "2008-12-01T00:00:00Z",
+    "last_verified": "2008-12-01T00:00:00Z",
+    "tags": ["communication", "style"]
+  }
+]

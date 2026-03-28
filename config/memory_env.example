@@ -1,0 +1,68 @@
+# Memory System Environment Configuration
+# Copy this file to the toolkit root as .memory_env:
+#   cp config/memory_env.example .memory_env
+#   nano .memory_env
+#
+# Then source it before running memory scripts:
+#   source .memory_env
+
+# --- Required ---
+
+# Redis connection (used for fast session capture)
+export REDIS_HOST=localhost
+export REDIS_PORT=6379
+
+# Qdrant connection (used for semantic search and durable storage)
+export QDRANT_URL=http://localhost:6333
+
+# Raw conversation backup collection (Jarvis Memory writes here at 3:00 AM)
+# Replace <agent> with your agent's name (e.g., myagent-memories)
+export QDRANT_COLLECTION=<agent>-memories
+
+# AI-curated gems collection (True Recall writes here at 2:30 AM)
+export TRUE_RECALL_COLLECTION=true_recall
+
+# Default user ID for single-user setups or fallback
+# For multi-user households, each cron job specifies --user-id explicitly
+export DEFAULT_USER_ID=<default-user-id>
+
+# Agent display name (used in speaker labels, email From, activity logs)
+# Replace with your agent's name (e.g., JARVIS, Claude, etc.)
+export AGENT_NAME=<agent>
+
+# --- Optional ---
+
+# Ollama URL for embeddings and curation (default: http://localhost:11434)
+# export OLLAMA_URL=http://localhost:11434
+
+# LLM model for True Recall curation and PARA promotion (REQUIRED)
+# For thinking models (e.g. Qwen3), the scripts pass think=false to avoid
+# the chain-of-thought consuming the entire output budget.
+# Pull it first: ollama pull qwen3:4b
+# Change to any Ollama instruct model you prefer.
+# Alternatives: qwen3:1.7b (less VRAM), qwen3:8b (higher quality). The model
+# must support structured JSON output.
+export CURATION_MODEL=qwen3:4b
+
+# Embedding model for vector search (default: snowflake-arctic-embed2, 1024 dims)
+# export EMBEDDING_MODEL=snowflake-arctic-embed2
+
+# Embedding vector dimensions — must match your EMBEDDING_MODEL output
+# Only change if you switch to a model with different dimensions
+# export EMBEDDING_DIMENSIONS=1024
+
+# Minimum confidence score for True Recall gem extraction
+# export MIN_CONFIDENCE=0.7
+
+# Backup directory for system backups
+# Used by health_check.sh and referenced in RECOVERY-RUNBOOK.md
+# Adjust for your backup infrastructure (e.g., a mounted drive, NAS, etc.)
+# export BACKUP_DIR=$HOME/.openclaw/backup
+
+# --- Advanced (usually don't need to change) ---
+
+# How long captured memories stay in Redis before curation (default: 24 hours)
+# export REDIS_TTL_HOURS=24
+
+# Override curator prompt file location (default: memory/curator_prompts/base.md)
+# export CURATOR_PROMPT_FILE=memory/curator_prompts/base.md

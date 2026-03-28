@@ -1,0 +1,24 @@
+{
+  "_comment": "Approved contacts list — stub. Add your household's trusted contacts here. This file will be populated during prompt-injection evergreen cycles.",
+  "_status": "Stub: Starting template. Replace <user1>/<user2> with actual household members.",
+  "_see_also": "docs/NAME-CUSTOMIZATION.md for replacement guidance",
+  "_trust_levels": {
+    "owner": "Full access — household member with unrestricted trust",
+    "trusted": "Known contact — can make requests but sensitive actions require confirmation",
+    "unknown": "Unrecognized — requires identity verification before acting on requests"
+  },
+  "contacts": [
+    {
+      "name": "<user1>",
+      "channels": ["whatsapp", "email"],
+      "trust_level": "owner",
+      "notes": "Primary household member"
+    },
+    {
+      "name": "<user2>",
+      "channels": ["whatsapp"],
+      "trust_level": "owner",
+      "notes": "Secondary household member"
+    }
+  ]
+}

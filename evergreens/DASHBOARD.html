@@ -1,0 +1,423 @@
+<!-- GENERATED FILE — Do not edit manually.
+     Built by scripts/update_evergreen_dashboard.py from evergreens/STATE.md + timing.json.
+     Ships with example data — will be regenerated with real data after first evergreen cycle. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evergreens Dashboard</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #0f1419;
+            color: #e7e9ea;
+            line-height: 1.6;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #2f3336;
+        }
+        h1 { font-size: 1.8em; color: #f7b267; }
+        .last-updated { color: #71767b; font-size: 0.9em; }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: #16181c;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #2f3336;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .card h2 { font-size: 1.1em; color: #f7b267; }
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 600;
+        }
+        .status-green { background: #00ba7c; color: white; }
+        .status-yellow { background: #f4af3d; color: black; }
+        .status-red { background: #f4212e; color: white; }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #2f3336;
+        }
+        .metric:last-child { border-bottom: none; }
+        .metric-label { color: #71767b; }
+        .metric-value { font-weight: 600; }
+
+        h3 {
+            font-size: 0.95em;
+            color: #71767b;
+            margin: 20px 0 10px 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .agenda-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 12px 0;
+            padding: 8px 12px;
+            background: #1a2a3a;
+            border-radius: 6px;
+        }
+        .agenda-btn {
+            display: inline-block;
+            padding: 4px 10px;
+            background: #1f4a6a;
+            color: #6bb3ff;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+        .agenda-btn:hover {
+            background: #2a5a7a;
+        }
+        .agenda-date {
+            color: #71767b;
+            font-size: 0.8em;
+        }
+
+        .task-list { list-style: none; }
+        .task-list li {
+            padding: 8px 12px;
+            margin: 6px 0;
+            background: #1d1f23;
+            border-radius: 6px;
+            font-size: 0.9em;
+        }
+        .task-pending { border-left: 3px solid #f4af3d; }
+        .task-done { border-left: 3px solid #00ba7c; opacity: 0.7; }
+
+        .cycle-info {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85em;
+            color: #71767b;
+            margin-bottom: 10px;
+        }
+        .cycle-badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .cycle-blue { background: #1f3a4a; color: #6bb3ff; }
+
+        .timing-info {
+            font-size: 0.8em;
+            color: #71767b;
+            margin-bottom: 10px;
+        }
+        .timing-info em { color: #f4af3d; }
+        .timing-duration {
+            color: #00ba7c;
+            font-weight: 600;
+        }
+
+        section {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #2f3336;
+        }
+        section h2 {
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            color: #f7b267;
+        }
+
+        .investment-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+        }
+        .investment-card {
+            background: #1a1a2e;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #9b59b6;
+        }
+        .investment-card h4 { color: #9b59b6; margin-bottom: 8px; }
+        .investment-card p { font-size: 0.9em; color: #a0a0a0; }
+        .investment-card .price { font-size: 1.2em; color: #f7b267; margin-top: 8px; }
+
+        footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #2f3336;
+            text-align: center;
+            color: #71767b;
+            font-size: 0.85em;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🌲 Evergreens Dashboard</h1>
+        <div class="last-updated">Data updated: <span id="data-timestamp">2009-01-03 12:15 PM</span></div>
+    </header>
+
+    <!-- System Overview -->
+    <div class="grid">
+        <div class="card">
+            <div class="card-header">
+                <h2>💻 System Status</h2>
+                <span class="status-badge status-yellow">Unknown</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">RAM</span>
+                <span class="metric-value">16 GB (8 GB used)</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Disk</span>
+                <span class="metric-value">500 GB (42% used)</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">CPU</span>
+                <span class="metric-value">4 cores</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">OpenClaw</span>
+                <span class="metric-value">2009.1.3</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Models</span>
+                <span class="metric-value">Check openclaw --version for details</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2>📊 Evergreen Summary</h2>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Active Programs</span>
+                <span class="metric-value">4</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Cycles Completed</span>
+                <span class="metric-value">0</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Open Tasks</span>
+                <span class="metric-value">19</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Active Experiments</span>
+                <span class="metric-value">0</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Blocking Issues</span>
+                <span class="metric-value">0</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Schedule</span>
+                <span class="metric-value">4:00–6:00 AM daily</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2>🔧 Services</h2>
+            </div>
+            
+            <div class="metric">
+                <span class="metric-label">Redis</span>
+                <span class="metric-value" style="color: #00ba7c;">✓ Running</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Qdrant</span>
+                <span class="metric-value" style="color: #71767b;">? QDRANT_COLLECTION not set in .memory_env</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Evergreen Cards -->
+    <div class="grid">
+        
+        <div class="card">
+            <div class="card-header">
+                <h2>🧠 Household Memory</h2>
+                <span class="status-badge status-green">Healthy</span>
+            </div>
+            <div class="cycle-info">
+                <span class="cycle-badge cycle-blue">Cycle</span>
+                Last: never
+            </div>
+            <div class="timing-info">
+                Duration: <span class="timing-duration">-</span>
+                
+            </div>
+            
+            <div class="agenda-link">
+                <a href="evergreens/household-memory/AGENDA.md" class="agenda-btn">📋 Current Agenda</a>
+                <span class="agenda-date">2009-01-03</span>
+            </div>
+            <h3>Next Steps</h3>
+            <ul class="task-list">
+                <li class="task-pending">Verify Redis buffer is working</li>
+<li class="task-pending">Verify Qdrant collection exists and is searchable</li>
+<li class="task-pending">Test True Recall curator end-to-end</li>
+<li class="task-pending">Add True Recall cron jobs</li>
+<li class="task-pending">Document current memory capture patterns</li>
+
+            </ul>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <h2>🛡️ Prompt-Injection Defense</h2>
+                <span class="status-badge status-green">Healthy</span>
+            </div>
+            <div class="cycle-info">
+                <span class="cycle-badge cycle-blue">Cycle</span>
+                Last: never
+            </div>
+            <div class="timing-info">
+                Duration: <span class="timing-duration">-</span>
+                
+            </div>
+            
+            <div class="agenda-link">
+                <a href="evergreens/prompt-injection/AGENDA.md" class="agenda-btn">📋 Current Agenda</a>
+                <span class="agenda-date">2009-01-03</span>
+            </div>
+            <h3>Next Steps</h3>
+            <ul class="task-list">
+                <li class="task-done">Design skill vetting process (V001) ✅</li>
+<li class="task-done">Test external content wrapping effectiveness (V005) ✅</li>
+<li class="task-done">Audit which tools require confirmation vs auto-execute (V003) ✅</li>
+<li class="task-done">Review credential file access patterns (V004) ✅</li>
+<li class="task-done">Design memory validation strategy (V002) ✅</li>
+
+            </ul>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <h2>❤️ System Health & DR</h2>
+                <span class="status-badge status-green">Healthy</span>
+            </div>
+            <div class="cycle-info">
+                <span class="cycle-badge cycle-blue">Cycle</span>
+                Last: never
+            </div>
+            <div class="timing-info">
+                Duration: <span class="timing-duration">-</span>
+                
+            </div>
+            
+            <div class="agenda-link">
+                <a href="evergreens/system-health/AGENDA.md" class="agenda-btn">📋 Current Agenda</a>
+                <span class="agenda-date">2009-01-03</span>
+            </div>
+            <h3>Next Steps</h3>
+            <ul class="task-list">
+                <li class="task-pending">Run initial system health check</li>
+<li class="task-pending">Set up backup strategy for critical files</li>
+<li class="task-pending">Create recovery runbooks</li>
+<li class="task-pending">Test restore procedure</li>
+<li class="task-pending">Set up external monitoring (optional)</li>
+
+            </ul>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <h2>🏗️ Upstream Architecture</h2>
+                <span class="status-badge status-green">Healthy</span>
+            </div>
+            <div class="cycle-info">
+                <span class="cycle-badge cycle-blue">Cycle</span>
+                Last: never
+            </div>
+            <div class="timing-info">
+                Duration: <span class="timing-duration">-</span>
+                
+            </div>
+            
+            <div class="agenda-link">
+                <a href="evergreens/upstream-architecture/AGENDA.md" class="agenda-btn">📋 Current Agenda</a>
+                <span class="agenda-date">2009-01-03</span>
+            </div>
+            <h3>Next Steps</h3>
+            <ul class="task-list">
+                <li class="task-pending">Monitor OpenClaw releases for breaking changes</li>
+<li class="task-pending">Check True Recall base for new features to adopt</li>
+<li class="task-pending">Review dependency versions in requirements.txt</li>
+<li class="task-pending">Evaluate OpenClaw version gap (current: 2008.12.25-2, recommended: 2009.1.3+ per prompt-injection/REFERENCES.md)</li>
+
+            </ul>
+        </div>
+    </div>
+
+    <!-- Investment Suggestions (customize these for your setup) -->
+    <section>
+        <h2>💰 Investment Suggestions</h2>
+        <p style="color: #71767b; margin-bottom: 15px;">Example recommendations — edit update_evergreen_dashboard.py to customize:</p>
+        <div class="investment-grid">
+            <div class="investment-card">
+                <h4>GPU Upgrade</h4>
+                <p>Enable local model inference (no cloud dependency), vision models, faster embeddings.</p>
+                <div class="price">Hardware (varies)</div>
+            </div>
+            <div class="investment-card">
+                <h4>RAM Upgrade</h4>
+                <p>More RAM enables larger local models and more concurrent operations.</p>
+                <div class="price">Hardware (varies)</div>
+            </div>
+            <div class="investment-card">
+                <h4>Cloud Backup Service</h4>
+                <p>Automated offsite backups for ~/.openclaw/, memory files, configurations. Better disaster recovery.</p>
+                <div class="price">Monthly subscription</div>
+            </div>
+            <div class="investment-card">
+                <h4>Monitoring Service</h4>
+                <p>Uptime monitoring, alerting for service failures, performance metrics over time.</p>
+                <div class="price">Monthly subscription (free tiers available)</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Recent Activity -->
+    <section>
+        <h2>📋 Recent Activity</h2>
+        <ul class="task-list">
+            <li class="task-done">2009-01-02: Example — memory capture patterns documented</li>
+<li class="task-done">2009-01-02: Example — True Recall curator integrated</li>
+<li class="task-done">2009-01-02: Example — health check script created with service monitoring</li>
+<li class="task-done">2009-01-02: Established upstream monitoring watchlist</li>
+<li class="task-done">2009-01-02: Checked OpenClaw, True Recall, and Agent Claw repos</li>
+
+        </ul>
+    </section>
+
+    <footer>
+        <p>Evergreens Dashboard • Generated from evergreens/STATE.md + timing.json</p>
+        <p>Framework: <a href="evergreens/EVERGREENS.md" style="color: #f7b267;">EVERGREENS.md</a></p>
+    </footer>
+</body>
+</html>

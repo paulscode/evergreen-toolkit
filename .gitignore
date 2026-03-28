@@ -1,0 +1,77 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+env/
+*.egg-info/
+
+# Logs
+logs/*
+!logs/.gitkeep
+*.log
+
+# Data
+*.sqlite
+*.db
+# JSON: only include explicit examples, timing files, and specific stubs
+*.json
+!*.example.json
+!evergreens/*/timing.json
+!memory/APPROVED-CONTACTS.json
+!memory/para/templates/items-template.json
+
+# Ignore .openclaw directory (user configs), but keep the toolkit manifest
+.openclaw/*
+!.openclaw/toolkit.json
+
+# Secrets (DO NOT COMMIT)
+.env
+.env.local
+.memory_env  # Primary config file — copy from config/memory_env.example
+*credentials*
+*secret*
+*.key
+api_key.txt
+.token
+
+# OS
+.DS_Store
+Thumbs.db
+
+# User memory data (created at runtime — contains private conversations)
+memory/*/
+!memory/scripts/
+!memory/curator_prompts/
+!memory/docs/
+!memory/para/
+
+# PARA user data (runtime — private per-user facts)
+memory/para/*/
+!memory/para/templates/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Runtime
+.pid
+*.sock
+.mem_last_turn
+
+# Evergreen runtime artifacts
+.backups/
+.evergreen-*.lock
+.evergreen-final-check-status.json
+.evergreen-alert.md
+evergreens/daily-briefing-*.md
+
+# Node.js (for markdown viewer)
+node_modules/
+
+#Internal documents
+internal-docs/

@@ -1,0 +1,263 @@
+# Evergreen Toolkit - Sample Crontab
+#
+# After running deploy.sh, a pre-filled version is generated at
+# config/crontab.generated with your workspace path substituted.
+# You can also customize this template manually.
+#
+# Usage: cp config/crontab.sample /tmp/my-crontab && nano /tmp/my-crontab && crontab /tmp/my-crontab
+#
+# IMPORTANT: This crontab uses wrapper scripts for reliable execution.
+# Do NOT use 'source .venv/bin/activate' in cron - it doesn't work in cron's minimal environment.
+# Use absolute Python paths instead. Sourcing `.memory_env` (simple exports) is fine.
+
+# ============================================================
+# ENVIRONMENT SETUP
+# ============================================================
+# Cron runs with minimal PATH - we must specify everything explicitly
+#
+# IMPORTANT: Set WORKSPACE below to your deployed workspace path.
+# If you used deploy.sh, this is the --workspace path you specified.
+# Cron does NOT expand ~ or $HOME in command paths.
+PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin
+SHELL=/bin/bash
+WORKSPACE=/path/to/openclaw-workspace
+
+# ============================================================
+# TIMEZONE: Adjust all times for your local timezone
+# ============================================================
+# Example times below assume America/Chicago (CST/CDT)
+# Check your timezone: timedatectl
+# Set if needed: sudo timedatectl set-timezone America/New_York
+
+# ============================================================
+# MEMORY & BACKUP (Before Evergreens) - CRITICAL ORDER!
+# ============================================================
+# IMPORTANT: True Recall MUST run before Jarvis backup.
+# - True Recall reads Redis buffer, extracts gems, does NOT clear Redis
+# - Jarvis backup reads Redis, backs up to Qdrant, THEN clears Redis
+# - If Jarvis runs first, True Recall has nothing to process!
+#
+# What happens if the order is wrong? Jarvis clears the Redis buffer after
+# backing up. If it runs before True Recall, the curated gem extraction
+# gets an empty buffer and produces no gems for that day. Raw backups in
+# Qdrant are still preserved, but the high-salience extraction is lost.
+#
+# Each user gets their own Redis key (mem:<user1>, mem:<user2>, etc.)
+# Jarvis clears only the specific user's key after that user's backup
+# succeeds, so <user1>'s 3:00 AM job won't affect <user2>'s buffer at 3:05 AM.
+# Jobs are spaced 5 minutes apart to avoid resource contention.
+# ============================================================
+
+# True Recall curation: Extract high-salience memories (2:30 AM)
+# Does NOT clear Redis - Jarvis handles that
+#
+# TWO-TIER STORAGE (default): curate_memories.py defaults to the
+# `true_recall` collection, while cron_backup.py (Jarvis) defaults to
+# `<agent>-memories`. This keeps curated gems separate from raw backups.
+# Override with QDRANT_COLLECTION env var if needed.
+30 2 * * * cd $WORKSPACE && source $WORKSPACE/.memory_env && $WORKSPACE/.venv/bin/python3 $WORKSPACE/memory/scripts/curate_memories.py --user-id <user1> >> $WORKSPACE/logs/true-recall.log 2>&1
+35 2 * * * cd $WORKSPACE && source $WORKSPACE/.memory_env && $WORKSPACE/.venv/bin/python3 $WORKSPACE/memory/scripts/curate_memories.py --user-id <user2> >> $WORKSPACE/logs/true-recall.log 2>&1
+
+# Jarvis Memory backup: Redis → Qdrant (3:00 AM)
+# Clears Redis buffer after successful backup
+0 3 * * * cd $WORKSPACE && source $WORKSPACE/.memory_env && $WORKSPACE/.venv/bin/python3 $WORKSPACE/memory/scripts/cron_backup.py --user-id <user1> >> $WORKSPACE/logs/memory-backup.log 2>&1
+5 3 * * * cd $WORKSPACE && source $WORKSPACE/.memory_env && $WORKSPACE/.venv/bin/python3 $WORKSPACE/memory/scripts/cron_backup.py --user-id <user2> >> $WORKSPACE/logs/memory-backup.log 2>&1
+
+# Session capture: New transcript messages → Redis (every 5 minutes)
+# Tracks byte offsets to only process new additions since last run.
+# This is separate from cron_backup.py — it feeds data INTO Redis,
+# while cron_backup.py moves data OUT of Redis to Qdrant.
+# NOTE: Multi-user entries run at the same interval but are safe to overlap.
+# If you experience file lock contention on shared JSONL transcript files,
+# stagger entries (e.g., */5 offset by 1 minute: 1,6,11,... for user2).
+*/5 * * * * cd $WORKSPACE && source $WORKSPACE/.memory_env && $WORKSPACE/.venv/bin/python3 $WORKSPACE/memory/scripts/cron_capture.py --user-id <user1> >> $WORKSPACE/logs/session-capture.log 2>&1
+*/5 * * * * cd $WORKSPACE && source $WORKSPACE/.memory_env && $WORKSPACE/.venv/bin/python3 $WORKSPACE/memory/scripts/cron_capture.py --user-id <user2> >> $WORKSPACE/logs/session-capture.log 2>&1
+# Staggered alternative (if you experience file lock contention):
+# */5 * * * * cd $WORKSPACE && source $WORKSPACE/.memory_env && $WORKSPACE/.venv/bin/python3 $WORKSPACE/memory/scripts/cron_capture.py --user-id <user1> >> $WORKSPACE/logs/session-capture.log 2>&1
+# 1,6,11,16,21,26,31,36,41,46,51,56 * * * * cd $WORKSPACE && source $WORKSPACE/.memory_env && $WORKSPACE/.venv/bin/python3 $WORKSPACE/memory/scripts/cron_capture.py --user-id <user2> >> $WORKSPACE/logs/session-capture.log 2>&1
+
+# Full system backup (3:30 AM) - Replace with your actual backup script
+# Runs after memory backup completes
+30 3 * * * /path/to/your/backup-script.sh >> $WORKSPACE/logs/backup.log 2>&1
+
+# ============================================================
+# PARA PROMOTION (Weekly) - True Recall gems → PARA durable knowledge
+# ============================================================
+# Runs weekly (Sunday 2:00 AM, before True Recall) to promote high-value
+# gems to PARA items.json. Uses tiered contradiction resolution:
+#   Tier 1: Auto-supersede (timestamps, versions)
+#   Tier 2: Auto-supersede + log (preferences, opinions)
+#   Tier 3: Queue for conversational review (relationships, identity)
+#
+# Each user gets their own promotion run.
+# --hours 168 = process last 7 days of gems since last promotion.
+0 2 * * 0 cd $WORKSPACE && source $WORKSPACE/.memory_env && $WORKSPACE/.venv/bin/python3 $WORKSPACE/memory/scripts/promote_to_para.py --user-id <user1> --hours 168 >> $WORKSPACE/logs/para-promotion.log 2>&1
+5 2 * * 0 cd $WORKSPACE && source $WORKSPACE/.memory_env && $WORKSPACE/.venv/bin/python3 $WORKSPACE/memory/scripts/promote_to_para.py --user-id <user2> --hours 168 >> $WORKSPACE/logs/para-promotion.log 2>&1
+
+# ============================================================
+# EVERGREENS - AI-Orchestrated Mode (Recommended)
+# ============================================================
+# The AI runner spawns a full AI agent session via `openclaw agent`.
+# The agent reads context, runs real commands, analyses findings,
+# and writes substantive reports — performing the cognitive work
+# that scripted executors cannot do.
+#
+# Requirements:
+# - OpenClaw installed and on PATH
+# - OpenClaw gateway running (auto-falls back to embedded mode if not)
+#
+# Each runs at its own time with 30-minute intervals.
+# Default timeout: 1500s (25 min). Override below for research-heavy evergreens.
+#
+# NOTE: upstream-architecture and household-memory typically run ~30 min,
+# which exceeds the default 25-min timeout. The entries below override
+# to EVERGREEN_TIMEOUT=2400 (40 min) for those two. You can also set
+# globally in the crontab environment:
+#   EVERGREEN_TIMEOUT=2400
+#
+# MODEL OVERRIDE (optional):
+# By default, evergreens use your system's default model. To route
+# evergreens to a more capable model (e.g., for technical accuracy):
+#
+#   1. Create a named agent:
+#      openclaw agents add evergreen --model "provider/model" --workspace "/path/to/workspace"
+#
+#   2. Set EVERGREEN_AGENT in your crontab environment:
+#      EVERGREEN_AGENT=evergreen
+#
+#   Or override per-evergreen inline:
+#      0 4 * * * EVERGREEN_AGENT=heavy-model /path/to/scripts/evergreen-ai-runner.sh upstream-architecture
+#
+#   Leave EVERGREEN_AGENT unset to use the system default model.
+#
+# FAILURE NOTIFICATIONS (optional):
+# Set EVERGREEN_NOTIFY_TARGET to receive alerts when a run fails and
+# files are rolled back. The target depends on your messaging channel
+# (e.g., phone number for WhatsApp/SMS, channel ID for Slack/Discord).
+# Configure your channel in openclaw.json first, then set the target:
+#
+#   EVERGREEN_NOTIFY_TARGET=<your-phone-number>
+#
+# Leave unset to skip notifications (failures are still logged).
+#
+# CROSS-EVERGREEN BRIEFING:
+# Each successful run appends a summary to evergreens/daily-briefing-YYYYMMDD.md.
+# Later evergreens read this file for cross-cutting context from earlier runs.
+# This happens automatically — no configuration needed.
+# ============================================================
+
+# upstream-architecture: 4:00 AM (~30 min runtime — 40-min timeout, overrides default 25 min)
+0 4 * * * EVERGREEN_TIMEOUT=2400 $WORKSPACE/scripts/evergreen-ai-runner.sh upstream-architecture
+
+# system-health: 4:30 AM
+30 4 * * * $WORKSPACE/scripts/evergreen-ai-runner.sh system-health
+
+# prompt-injection: 5:00 AM
+0 5 * * * $WORKSPACE/scripts/evergreen-ai-runner.sh prompt-injection
+
+# household-memory: 5:30 AM (~30 min runtime — 40-min timeout, overrides default 25 min)
+30 5 * * * EVERGREEN_TIMEOUT=2400 $WORKSPACE/scripts/evergreen-ai-runner.sh household-memory
+
+# Final Check: 6:00 AM (verify all ran, send notification)
+# Uses --force flag to always send status (success or failure)
+# Configure your notification in openclaw.json (WhatsApp, Telegram, etc.)
+0 6 * * * $WORKSPACE/scripts/final-check-wrapper.sh
+
+# ============================================================
+# WEEKLY DEEP-ANALYSIS CYCLE (Optional — Opt-In)
+# ============================================================
+# A once-per-week meta-cycle that performs heavier, LLM-powered analysis
+# across all evergreens: semantic learning compaction, cross-evergreen
+# synthesis, PARA candidate extraction, Next Steps triage, trend projection.
+#
+# Daily cycles work fine without this. The weekly cycle produces enrichment
+# files (weekly-synthesis-YYYYMMDD.md) that daily cycles read if available.
+#
+# Prerequisites: Same as daily AI runner (openclaw on PATH, gateway running).
+# Budget: ~60-90 min single LLM session, runs once per week.
+#
+# The script runs the shell-side keyword synthesis first (no LLM), then
+# spawns an AI agent for deeper semantic analysis. If the LLM step fails,
+# the shell-side output remains as fallback.
+
+# Weekly deep analysis: Sunday 6:30 AM (after daily cycles and final-check)
+30 6 * * 0 $WORKSPACE/scripts/evergreen-weekly-cycle.sh
+
+# ============================================================
+# OPTIONAL: Shell-Side Weekly Synthesis Only (No LLM)
+# ============================================================
+# If you don't want the full LLM-powered weekly cycle but still want
+# cross-evergreen keyword overlap detection, run the shell-side synthesis
+# standalone. This is already called by the full weekly cycle script above,
+# so don't enable both.
+#
+# 30 6 * * 0 cd $WORKSPACE && $WORKSPACE/.venv/bin/python3 $WORKSPACE/scripts/weekly-synthesis.py --days 7 >> $WORKSPACE/logs/weekly-synthesis.log 2>&1
+
+# ============================================================
+# OPTIONAL: Additional Monitoring
+# ============================================================
+
+# Morning diagnostic: Manual check with status output (7:00 AM)
+# Useful for debugging - outputs JSON status to log
+0 7 * * * cd $WORKSPACE && $WORKSPACE/.venv/bin/python3 $WORKSPACE/scripts/evergreen-final-check.py --status >> $WORKSPACE/logs/evergreen-diagnostic.log 2>&1
+
+# Weekly log cleanup: remove log files older than 30 days (Sunday midnight)
+0 0 * * 0 find $WORKSPACE/logs/ -name "*.log" -mtime +30 -delete
+
+# ============================================================
+# ROTATION SCHEDULE (OPTIONAL)
+# ============================================================
+# By default every evergreen runs once a day (see above).
+# If you prefer to rotate them across different days to reduce
+# nightly load, uncomment and adapt the examples below.
+#
+# Example: run each evergreen on a specific weekday (0=Sun … 6=Sat)
+# 0 4 * * 1 $WORKSPACE/scripts/evergreen-ai-runner.sh upstream-architecture  # Monday
+# 0 4 * * 2 $WORKSPACE/scripts/evergreen-ai-runner.sh system-health           # Tuesday
+# 0 4 * * 3 $WORKSPACE/scripts/evergreen-ai-runner.sh prompt-injection        # Wednesday
+# 0 4 * * 4 $WORKSPACE/scripts/evergreen-ai-runner.sh household-memory        # Thursday
+
+# ============================================================
+# SETUP INSTRUCTIONS
+# ============================================================
+# 
+# 1. Copy this file:
+#    cp config/crontab.sample /tmp/my-crontab
+#
+# 2. Edit with your paths and user IDs:
+#    nano /tmp/my-crontab
+#    - Set WORKSPACE variable at the top to your deployed workspace path
+#      (e.g., /home/yourname/.openclaw/workspace — NOT the cloned repo)
+#    - Replace <user1>, <user2> with your actual user IDs
+#    - Adjust times for your timezone
+#
+# 3. Install the crontab:
+#    crontab /tmp/my-crontab
+#
+# 4. Verify installation:
+#    crontab -l
+#
+# 5. Check logs after first run:
+#    tail -f $WORKSPACE/logs/evergreen-system-health-$(date +%Y%m%d).log
+#    tail -f $WORKSPACE/logs/evergreen-final-check.log
+#
+# 6. Test manually before relying on cron:
+#    cd $WORKSPACE
+#    ./scripts/evergreen-ai-runner.sh system-health
+#
+# ============================================================
+# TROUBLESHOOTING
+# ============================================================
+# 
+# If evergreens don't run:
+# - Check cron daemon: systemctl status cron (or crond on some systems)
+# - Check cron logs: grep CRON /var/log/syslog | tail -20
+# - Verify scripts are executable: chmod +x scripts/*.sh
+# - Check gateway health: openclaw health
+# - Test AI runner manually: ./scripts/evergreen-ai-runner.sh system-health
+#
+# If notifications don't arrive:
+# - Verify OpenClaw channel is configured: openclaw channels list
+# - Test notification manually: openclaw message send --target <your-phone-number> --message "test"
+# - Check final check log: tail logs/evergreen-final-check.log
+#

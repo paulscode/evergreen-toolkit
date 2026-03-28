@@ -1,0 +1,105 @@
+{
+  "_comment": "OpenClaw Plugin Configuration Example",
+  "_description": "Copy relevant sections to your ~/.openclaw/openclaw.json",
+  
+  "plugins": {
+    "entries": {
+      
+      "memory-redis": {
+        "_description": "Redis memory buffer for fast capture",
+        "config": {
+          "redisHost": "localhost",
+          "redisPort": 6379,
+          "keyPrefix": "mem:",
+          "ttl": 86400
+        },
+        "enabled": true
+      },
+      
+      "memory-qdrant": {
+        "_description": "Qdrant vector store for semantic search. Replace '<agent>-memories' with your QDRANT_COLLECTION value from .memory_env",
+        "_note": "This configures the raw backup collection only. The true_recall collection (curated gems) is managed by the Python scripts (curate_memories.py) and does not need an OpenClaw plugin entry.",
+        "config": {
+          "qdrantHost": "localhost",
+          "qdrantPort": 6333,
+          "collection": "<agent>-memories",
+          "apiKey": "<QDRANT_API_KEY_IF_REQUIRED>"
+        },
+        "enabled": true
+      },
+      
+      "voice-call": {
+        "_description": "Voice call support via Twilio/Telnyx",
+        "config": {
+          "provider": "twilio",
+          "enabled": false,
+          "allowFrom": ["+1XXXYYYZZZZ"],
+          "fromNumber": "+1XXXXXXXXXX"
+        },
+        "enabled": false
+      },
+      
+      "discord": {
+        "_description": "Discord channel support",
+        "config": {
+          "botToken": "<DISCORD_BOT_TOKEN>",
+          "guildId": "<DISCORD_GUILD_ID>"
+        },
+        "enabled": false
+      },
+      
+      "telegram": {
+        "_description": "Telegram channel support",
+        "config": {
+          "botToken": "<TELEGRAM_BOT_TOKEN>"
+        },
+        "enabled": false
+      },
+      
+      "whatsapp": {
+        "_description": "WhatsApp channel support",
+        "enabled": false,
+        "config": {
+          "allowFrom": ["+1XXXYYYZZZZ"],
+          "dmPolicy": "allowlist"
+        }
+      },
+
+      "gigabrain": {
+        "_description": "Automatic pre-prompt recall + capture + deduplication (Layer 1). Injects relevant past context at session start. Complements (does not replace) the Redis capture pipeline. See docs/PLUGIN-RECOMMENDATIONS.md for details.",
+        "enabled": false,
+        "config": {
+          "vaultMirror": true,
+          "deduplication": true,
+          "maxSlots": 20
+        }
+      },
+
+      "lossless-context-management": {
+        "_description": "Session compaction + transcript recovery (Layer 1). Keeps long sessions coherent without losing context. Session-scoped only — NOT durable truth. See docs/PLUGIN-RECOMMENDATIONS.md for details.",
+        "enabled": false,
+        "config": {
+          "maxContextTokens": 32000,
+          "compactionStrategy": "summarize"
+        }
+      },
+
+      "openstinger": {
+        "_description": "Cross-session semantic + temporal graph recall (optional). Provides graph-based entity/relationship traversal across sessions. Advanced — most deployments don't need this. See docs/PLUGIN-RECOMMENDATIONS.md for details.",
+        "enabled": false,
+        "config": {
+          "sseEndpoint": "http://localhost:8080",
+          "mode": "alongside"
+        }
+      }
+    
+    }
+  },
+  
+  "_tips": {
+    "enable_plugin": "Set enabled: true and add your config",
+    "disable_plugin": "Set enabled: false or remove the entry",
+    "secrets": "Use secrets management for tokens (see docs.openclaw.ai/gateway/secrets)",
+    "apply_config": "Run: openclaw config.apply after editing"
+  }
+}

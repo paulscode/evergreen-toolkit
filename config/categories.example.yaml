@@ -1,0 +1,48 @@
+# Per-user interest areas for memory gem classification
+#
+# Copy this file to memory/<user_id>/categories.yaml for each household member.
+# Used by curate_memories.py to organize extracted gems by personal interests.
+# Each top-level key is an interest area, and its list items are sub-topics.
+#
+# NOTE: These are NOT the gem categories used by the curator prompt.
+# The curator (memory/curator_prompts/base.md) classifies gems by type (e.g.,
+# decision, preference, insight). This file adds a second layer of
+# user-specific interest labels so gems can be filtered by topic.
+#
+# The curation script reads this file to add interest-area tags to gems
+# so they can be filtered or searched by topic. Extend freely — add new
+# top-level areas or sub-topics to fit your household's needs.
+#
+# If this file is missing, curation will still work but gems won't have
+# interest-area tags.
+
+relationships:
+  - family
+  - friends
+  - colleagues
+  - neighbors
+
+preferences:
+  - food
+  - activities
+  - routines
+  - communication-style
+  - technology
+
+knowledge:
+  - work
+  - hobbies
+  - skills
+  - health
+
+decisions:
+  - financial
+  - household
+  - technical
+  - scheduling
+
+events:
+  - appointments
+  - milestones
+  - travel
+  - celebrations

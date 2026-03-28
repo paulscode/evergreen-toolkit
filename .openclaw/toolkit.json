@@ -1,0 +1,15 @@
+{
+  "name": "evergreen-toolkit",
+  "description": "Self-improving automation framework for OpenClaw agents serving multi-user households",
+  "version": "1.0.0",
+  "type": "evergreen-toolkit",
+  "entrypoint": "AGENT-ONBOARDING.md",
+  "docs": {
+    "readme": "README.md",
+    "onboarding": "AGENT-ONBOARDING.md",
+    "quickstart": "QUICKSTART.md",
+    "architecture": "ARCHITECTURE.md",
+    "setup": "docs/SETUP-GUIDE.md",
+    "glossary": "GLOSSARY.md"
+  }
+}

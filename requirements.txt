@@ -1,0 +1,16 @@
+# Python Requirements for Evergreen Toolkit
+# Requires Python 3.10+
+
+# Core dependencies
+qdrant-client>=1.7.0,<3.0.0
+redis>=5.0.0,<7.0.0
+
+# Utilities
+requests>=2.31.0,<3.0.0        # Used by memory scripts for HTTP calls (Qdrant, Ollama)
+pyyaml>=6.0,<7.0
+
+# Optional: For advanced embeddings (can use local Ollama instead)
+# openai>=1.12.0
+
+# Optional: Email processing
+# imap-tools>=1.4.0
