@@ -298,7 +298,15 @@ AGENT_CMD=("$OPENCLAW" agent)
 AGENT_CMD+=(--message "$TASK_PROMPT" --session-id "$SESSION_ID" --timeout "$TIMEOUT_SECONDS" --json)
 
 AGENT_EXIT=0
-AGENT_OUTPUT=$("${AGENT_CMD[@]}" 2>&1) || AGENT_EXIT=$?
+AGENT_STDERR_FILE=$(mktemp)
+trap "rm -f '$AGENT_STDERR_FILE'" EXIT
+AGENT_OUTPUT=$("${AGENT_CMD[@]}" 2>"$AGENT_STDERR_FILE") || AGENT_EXIT=$?
+
+# Log stderr (config warnings, errors) separately
+if [[ -s "$AGENT_STDERR_FILE" ]]; then
+    log "Agent stderr:"
+    cat "$AGENT_STDERR_FILE" >> "$LOG_FILE"
+fi
 
 # Log the full agent output
 echo "$AGENT_OUTPUT" >> "$LOG_FILE"
@@ -307,8 +315,20 @@ echo "$AGENT_OUTPUT" >> "$LOG_FILE"
 if [[ -x "$PYTHON" ]]; then
     SUMMARY=$(echo "$AGENT_OUTPUT" | "$PYTHON" -c "
 import sys, json
+text = sys.stdin.read()
+d = None
 try:
-    d = json.load(sys.stdin)
+    d = json.loads(text)
+except json.JSONDecodeError:
+    decoder = json.JSONDecoder()
+    for i, c in enumerate(text):
+        if c == '{':
+            try:
+                d, _ = decoder.raw_decode(text, i)
+                break
+            except json.JSONDecodeError:
+                continue
+if d:
     m = d.get('result', {}).get('meta', {}).get('agentMeta', {})
     model = m.get('model', 'unknown')
     provider = m.get('provider', 'unknown')
@@ -317,28 +337,70 @@ try:
     payloads = d.get('result', {}).get('payloads', [])
     text_len = sum(len(p.get('text', '')) for p in payloads)
     print(f'Model: {provider}/{model} | Duration: {dur/1000:.1f}s | Stop: {stop} | Response: {text_len} chars')
-except:
+else:
     print('(could not parse JSON output)')
 " 2>/dev/null) || SUMMARY="(no JSON summary)"
     log "Agent result: $SUMMARY"
+fi
+
+# ── Check for incomplete agent session ────────────────────────────────
+if [[ -x "$PYTHON" ]]; then
+    STOP_REASON=$(echo "$AGENT_OUTPUT" | "$PYTHON" -c "
+import sys, json
+text = sys.stdin.read()
+d = None
+try:
+    d = json.loads(text)
+except json.JSONDecodeError:
+    decoder = json.JSONDecoder()
+    for i, c in enumerate(text):
+        if c == '{':
+            try:
+                d, _ = decoder.raw_decode(text, i)
+                break
+            except json.JSONDecodeError:
+                continue
+if d:
+    print(d.get('result', {}).get('meta', {}).get('stopReason', 'unknown'))
+else:
+    print('unknown')
+" 2>/dev/null) || STOP_REASON="unknown"
+
+    if [[ "$STOP_REASON" == "toolUse" ]]; then
+        log "WARN: Agent session ended mid-tool-call (stopReason=toolUse) — cycle likely incomplete"
+    elif [[ "$STOP_REASON" == "error" ]]; then
+        log "WARN: Agent session ended with model error (stopReason=error)"
+    fi
 fi
 
 # ── Extract response preview for log ──────────────────────────────────
 if [[ -x "$PYTHON" ]]; then
     SNIPPET=$(echo "$AGENT_OUTPUT" | "$PYTHON" -c "
 import sys, json
+text = sys.stdin.read()
+d = None
 try:
-    d = json.load(sys.stdin)
+    d = json.loads(text)
+except json.JSONDecodeError:
+    decoder = json.JSONDecoder()
+    for i, c in enumerate(text):
+        if c == '{':
+            try:
+                d, _ = decoder.raw_decode(text, i)
+                break
+            except json.JSONDecodeError:
+                continue
+if d:
     payloads = d.get('result', {}).get('payloads', [])
     text = ' '.join(p.get('text', '') for p in payloads)
     preview = text[:300].replace('\n', ' ').strip()
     if len(text) > 300:
         preview += '...'
-    print(preview)
-except:
+    print(preview if preview else '(no preview available)')
+else:
     print('(no preview available)')
 " 2>/dev/null) || SNIPPET=""
-    [[ -n "$SNIPPET" ]] && log "Preview: $SNIPPET"
+    [[ -n "$SNIPPET" && "$SNIPPET" != "(no preview available)" ]] && log "Preview: $SNIPPET"
 fi
 
 # ── Verify completion & validate output ────────────────────────────────

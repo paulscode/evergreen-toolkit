@@ -13,6 +13,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## 1.0.1 — 2026-03-31
+
+### Fixed
+- **AI runner: JSON parsing failure when OpenClaw emits config warnings** — The agent
+  invocation merged stderr into stdout (`2>&1`), causing `json.load()` to fail when
+  OpenClaw wrote config warnings (e.g. duplicate plugin, version mismatch) before the
+  JSON result. Separated stderr into a temp file and log it independently. This
+  affected all evergreen runs, silently losing model/duration/stopReason diagnostics.
+- **AI runner: robust fallback parser for mixed text+JSON output** — If stderr
+  separation is insufficient (e.g. future OpenClaw versions change stream behavior),
+  the inline Python parser now falls back to `json.JSONDecoder.raw_decode()` to
+  extract JSON from mixed output, instead of failing silently.
+
+### Added
+- **AI runner: stopReason detection and logging** — After parsing agent output, the
+  runner now checks `stopReason` and logs a warning when the agent session ended
+  mid-tool-call (`toolUse`) or with a model error (`error`). Previously these
+  conditions were masked by the JSON parse failure and reported generically as
+  "Post-run validation failed".
+
+---
+
 ## 1.0.0 — 2026-03-27 [Initial Release]
 
 First public release of the Evergreen Toolkit.
