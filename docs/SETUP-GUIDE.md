@@ -331,6 +331,29 @@ After a successful first run:
 
 ### Option A: AI Runner (Recommended)
 
+> **⚠️ CRITICAL — Configure exec tool permissions (OpenClaw v2026.3.31+):**
+> OpenClaw v2026.3.31 introduced **exec approvals** — enabled by default — which requires manual approval for every shell command the agent tries to run. Since evergreen cycles run autonomously via cron and need to execute shell commands (health checks, system probes, file operations), this approval gate must be disabled for autonomous operation.
+>
+> Add the following to your `~/.openclaw/openclaw.json`:
+>
+> ```json
+> {
+>   "tools": {
+>     "exec": {
+>       "security": "full",
+>       "ask": "off"
+>     }
+>   }
+> }
+> ```
+>
+> - **`security: "full"`** — allows all shell commands (alternative: `"allowlist"` to restrict to pre-approved commands, or `"deny"` to block all exec)
+> - **`ask: "off"`** — disables the interactive approval prompt (alternative: `"on-miss"` to prompt only for non-allowlisted commands, or `"always"` to prompt for every command)
+>
+> Without this, the AI runner will hang waiting for approval that never comes during unattended cron execution. The `preflight-check.py` script verifies this setting.
+>
+> **Security note:** This grants the agent unrestricted shell access. If you prefer a more restrictive setup, use `"security": "allowlist"` with `"ask": "on-miss"` — but you will need to pre-populate the exec allowlist (`~/.openclaw/exec-approvals.json`) with every command the evergreens need. See the [OpenClaw documentation](https://docs.openclaw.ai) for allowlist management.
+
 ```bash
 # Run a single evergreen with full AI agent session
 ./scripts/evergreen-ai-runner.sh system-health

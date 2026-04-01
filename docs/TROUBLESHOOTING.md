@@ -388,6 +388,51 @@ ps aux | grep -i evergreen
 
 ## AI Runner Issues
 
+### Commands Require Approval / Agent Hangs Waiting for Input
+
+**Symptoms:**
+- AI runner hangs indefinitely during cron execution
+- Manual `openclaw agent` sessions prompt for approval before every shell command
+- Log shows no progress after agent session starts
+- Evergreen times out without producing output
+
+**Cause:** OpenClaw v2026.3.31+ enables **exec approvals** by default. Every shell command the agent tries to run requires interactive approval — which never comes during unattended cron execution.
+
+**Solution:** Add the exec tool configuration to `~/.openclaw/openclaw.json`:
+
+```json
+{
+  "tools": {
+    "exec": {
+      "security": "full",
+      "ask": "off"
+    }
+  }
+}
+```
+
+Then restart the OpenClaw gateway:
+
+```bash
+openclaw gateway restart
+```
+
+**Verify the fix:**
+
+```bash
+# Quick test — agent should execute this without prompting for approval
+openclaw agent --message "Run: echo hello world" --json
+
+# Or run the preflight check (v1.1.0+)
+python3 scripts/preflight-check.py
+```
+
+> **Note:** The `approvals.exec.enabled` key in openclaw.json controls approval *routing* to notification channels — it does NOT control the approval gate itself. The `exec-approvals.json` file manages a per-command allowlist but requires `tools.exec.security: "allowlist"` to take effect. For fully autonomous operation, `tools.exec.security: "full"` with `tools.exec.ask: "off"` is the correct configuration.
+
+> **Security alternative:** If unrestricted shell access is a concern, use `"security": "allowlist"` with `"ask": "on-miss"` and pre-populate `~/.openclaw/exec-approvals.json` with commands your evergreens need. This requires more setup but limits the agent to approved commands only.
+
+---
+
 ### Gateway Health Check Fails
 
 **Symptoms:** AI runner logs show "Gateway health check failed" warning

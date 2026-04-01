@@ -9,6 +9,7 @@ Usage:
     python3 scripts/preflight-check.py
 """
 
+import json
 import os
 import shutil
 import subprocess
@@ -115,6 +116,34 @@ def main():
 
     venv = WORKSPACE / ".venv"
     check("Virtual environment", venv.exists(), str(venv), "Missing — run: python3 -m venv .venv")
+
+    # --- OpenClaw exec config ---
+    print("\nOpenClaw exec config:")
+    openclaw_home = Path(os.environ.get("OPENCLAW_HOME", Path.home() / ".openclaw"))
+    oc_config = openclaw_home / "openclaw.json"
+    check("openclaw.json exists", oc_config.exists(), str(oc_config), f"Not found at {oc_config}", warn_only=True)
+
+    if oc_config.exists():
+        try:
+            oc_data = json.loads(oc_config.read_text())
+            tools_exec = oc_data.get("tools", {}).get("exec", {})
+            exec_security = tools_exec.get("security", "")
+            exec_ask = tools_exec.get("ask", "")
+
+            check(
+                "tools.exec.security",
+                exec_security == "full",
+                "full",
+                f'{"not set" if not exec_security else repr(exec_security)} — set to "full" in openclaw.json (required for autonomous shell commands)',
+            )
+            check(
+                "tools.exec.ask",
+                exec_ask == "off",
+                "off",
+                f'{"not set" if not exec_ask else repr(exec_ask)} — set to "off" in openclaw.json (required for unattended cron execution)',
+            )
+        except (json.JSONDecodeError, OSError) as exc:
+            check("openclaw.json readable", False, msg_fail=f"Parse error: {exc}")
 
     # --- Workspace structure ---
     print("\nWorkspace structure:")

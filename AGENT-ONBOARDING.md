@@ -69,10 +69,28 @@ This scaffolding ensures the file structure is in place and agents can see the e
 
 | File | Purpose | When |
 |------|---------|------|
+| `~/.openclaw/openclaw.json` | OpenClaw exec tool permissions (see below) | Before first AI runner test (QUICKSTART Step 7) |
 | `.memory_env` | Redis, Qdrant, Ollama connection details | Checklist item 4 (copy from `config/memory_env.example`) |
 | `memory/settings.md` | Household member definitions (reference doc) | QUICKSTART Step 9 (name customization) |
 | `memory/curator_prompts/<user_id>.md` | Per-user curation instructions | QUICKSTART Step 9 |
 | `config/crontab.sample` | Scheduling template | QUICKSTART Step 10 (customize, then install) |
+
+### OpenClaw Exec Tool Permissions (Required for AI Runner)
+
+OpenClaw v2026.3.31+ enables **exec approvals** by default, requiring manual approval for every shell command. The AI runner and evergreen cycles need unrestricted shell access to function autonomously. Add this to `~/.openclaw/openclaw.json`:
+
+```json
+{
+  "tools": {
+    "exec": {
+      "security": "full",
+      "ask": "off"
+    }
+  }
+}
+```
+
+Without this, agent sessions will hang waiting for approval during unattended cron execution. See [QUICKSTART.md Step 7](QUICKSTART.md#7-test-one-evergreen) for details and security alternatives.
 
 ## Key Files You'll Touch (Runtime)
 

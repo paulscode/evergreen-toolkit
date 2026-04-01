@@ -13,6 +13,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## 1.1.0 — 2026-04-01
+
+### Added
+- **OpenClaw exec tool configuration requirement documented** — OpenClaw v2026.3.31+
+  enables exec approvals by default, which blocks autonomous shell command execution.
+  Documented the required `tools.exec.security: "full"` and `tools.exec.ask: "off"`
+  configuration in QUICKSTART.md (Step 7), SETUP-GUIDE.md, and AGENT-ONBOARDING.md
+  with justification and security alternatives.
+- **Pre-flight check: OpenClaw exec config validation** — `preflight-check.py` now
+  reads `~/.openclaw/openclaw.json` and verifies that `tools.exec.security` is `"full"`
+  and `tools.exec.ask` is `"off"`, catching misconfiguration before first run.
+- **Troubleshooting: "Commands Require Approval" entry** — New troubleshooting section
+  covering symptoms, root cause, and fix for the exec approval gate introduced in
+  OpenClaw v2026.3.31.
+
+---
+
 ## 1.0.1 — 2026-03-31
 
 ### Fixed
