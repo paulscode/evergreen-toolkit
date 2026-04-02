@@ -398,15 +398,24 @@ ps aux | grep -i evergreen
 
 **Cause:** OpenClaw v2026.3.31+ enables **exec approvals** by default. Every shell command the agent tries to run requires interactive approval — which never comes during unattended cron execution.
 
-**Solution:** Add the exec tool configuration to `~/.openclaw/openclaw.json`:
+**Important detail:** The embedded agent runtime (used by the AI runner) resolves exec policy from the **per-agent** config (`agents.list[].tools.exec`), not from the top-level `tools.exec`. Setting `tools.exec` at the top level only works for interactive `openclaw agent` sessions from a terminal. If you set it top-level only, your interactive agent will work but scheduled evergreen cycles will still hang.
+
+**Solution:** Add the exec tool configuration to the agent entry in `~/.openclaw/openclaw.json`:
 
 ```json
 {
-  "tools": {
-    "exec": {
-      "security": "full",
-      "ask": "off"
-    }
+  "agents": {
+    "list": [
+      {
+        "id": "evergreen",
+        "tools": {
+          "exec": {
+            "security": "full",
+            "ask": "off"
+          }
+        }
+      }
+    ]
   }
 }
 ```
@@ -421,13 +430,16 @@ openclaw gateway restart
 
 ```bash
 # Quick test — agent should execute this without prompting for approval
-openclaw agent --message "Run: echo hello world" --json
+# Use --agent to test the specific agent that runs evergreens
+openclaw agent --agent evergreen --message "Run: echo hello world" --json
 
 # Or run the preflight check (v1.1.0+)
 python3 scripts/preflight-check.py
 ```
 
-> **Note:** The `approvals.exec.enabled` key in openclaw.json controls approval *routing* to notification channels — it does NOT control the approval gate itself. The `exec-approvals.json` file manages a per-command allowlist but requires `tools.exec.security: "allowlist"` to take effect. For fully autonomous operation, `tools.exec.security: "full"` with `tools.exec.ask: "off"` is the correct configuration.
+> **Note:** The `approvals.exec.enabled` key in openclaw.json controls approval *routing* to notification channels — it does NOT control the approval gate itself. The `exec-approvals.json` file manages a per-command allowlist but requires `tools.exec.security: "allowlist"` to take effect. For fully autonomous operation, `agents.list[].tools.exec.security: "full"` with `agents.list[].tools.exec.ask: "off"` is the correct configuration.
+
+> **Common mistake:** Setting `tools.exec` at the top level of `openclaw.json` instead of per-agent. The top-level config only applies to the CLI path (`openclaw agent` from a terminal). The AI runner uses the embedded runtime, which reads `agents.list[].tools.exec` directly. If interactive testing works but cron jobs hang, this is almost certainly the cause.
 
 > **Security alternative:** If unrestricted shell access is a concern, use `"security": "allowlist"` with `"ask": "on-miss"` and pre-populate `~/.openclaw/exec-approvals.json` with commands your evergreens need. This requires more setup but limits the agent to approved commands only.
 

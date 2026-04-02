@@ -126,22 +126,41 @@ def main():
     if oc_config.exists():
         try:
             oc_data = json.loads(oc_config.read_text())
-            tools_exec = oc_data.get("tools", {}).get("exec", {})
-            exec_security = tools_exec.get("security", "")
-            exec_ask = tools_exec.get("ask", "")
 
-            check(
-                "tools.exec.security",
-                exec_security == "full",
-                "full",
-                f'{"not set" if not exec_security else repr(exec_security)} — set to "full" in openclaw.json (required for autonomous shell commands)',
-            )
-            check(
-                "tools.exec.ask",
-                exec_ask == "off",
-                "off",
-                f'{"not set" if not exec_ask else repr(exec_ask)} — set to "off" in openclaw.json (required for unattended cron execution)',
-            )
+            # Check per-agent tools.exec for each agent that runs evergreens.
+            # The embedded agent runtime resolves exec policy from the per-agent
+            # config (agents.list[].tools.exec), NOT from the top-level tools.exec.
+            # Top-level tools.exec only applies to the CLI path (openclaw agent
+            # from a terminal).  The AI runner spawns embedded agent sessions,
+            # so per-agent config is required for autonomous operation.
+            agents_list = oc_data.get("agents", {}).get("list", [])
+            evergreen_agents = [a for a in agents_list if a.get("id") in ("evergreen",)]
+            if not evergreen_agents:
+                # Fall back: check any agent, or warn if no agents defined
+                evergreen_agents = agents_list
+
+            for agent in evergreen_agents:
+                agent_id = agent.get("id", "unknown")
+                agent_exec = agent.get("tools", {}).get("exec", {})
+                a_security = agent_exec.get("security", "")
+                a_ask = agent_exec.get("ask", "")
+
+                check(
+                    f"agent '{agent_id}' tools.exec.security",
+                    a_security == "full",
+                    "full",
+                    f'{"not set" if not a_security else repr(a_security)} — add tools.exec.security: "full" to this agent entry in openclaw.json',
+                )
+                check(
+                    f"agent '{agent_id}' tools.exec.ask",
+                    a_ask == "off",
+                    "off",
+                    f'{"not set" if not a_ask else repr(a_ask)} — add tools.exec.ask: "off" to this agent entry in openclaw.json',
+                )
+
+            if not agents_list:
+                check("agents.list", False, msg_fail="No agents configured in openclaw.json — cannot verify exec config", warn_only=True)
+
         except (json.JSONDecodeError, OSError) as exc:
             check("openclaw.json readable", False, msg_fail=f"Parse error: {exc}")
 

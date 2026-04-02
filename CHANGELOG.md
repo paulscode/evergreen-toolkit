@@ -15,18 +15,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 1.1.0 — 2026-04-01
 
+### Fixed
+- **Exec config must be per-agent, not top-level** — The embedded agent runtime (used
+  by the AI runner for scheduled cycles) resolves exec policy from the per-agent config
+  (`agents.list[].tools.exec`), not from the top-level `tools.exec`. A top-level
+  setting only applies to interactive CLI sessions. All documentation and the
+  preflight check now correctly instruct users to set `tools.exec.security: "full"`
+  and `tools.exec.ask: "off"` on each agent entry in `agents.list`, not at the top
+  level. Without this, the interactive agent works but scheduled evergreen cycles hang
+  waiting for approval that never arrives.
+
 ### Added
 - **OpenClaw exec tool configuration requirement documented** — OpenClaw v2026.3.31+
   enables exec approvals by default, which blocks autonomous shell command execution.
-  Documented the required `tools.exec.security: "full"` and `tools.exec.ask: "off"`
-  configuration in QUICKSTART.md (Step 7), SETUP-GUIDE.md, and AGENT-ONBOARDING.md
-  with justification and security alternatives.
-- **Pre-flight check: OpenClaw exec config validation** — `preflight-check.py` now
-  reads `~/.openclaw/openclaw.json` and verifies that `tools.exec.security` is `"full"`
-  and `tools.exec.ask` is `"off"`, catching misconfiguration before first run.
+  Documented the required per-agent `agents.list[].tools.exec` configuration in
+  QUICKSTART.md (Step 7), SETUP-GUIDE.md, and AGENT-ONBOARDING.md with justification
+  and security alternatives.
+- **Pre-flight check: per-agent exec config validation** — `preflight-check.py` now
+  reads `~/.openclaw/openclaw.json` and verifies that each agent in `agents.list` has
+  `tools.exec.security` set to `"full"` and `tools.exec.ask` set to `"off"`, catching
+  misconfiguration before first run.
 - **Troubleshooting: "Commands Require Approval" entry** — New troubleshooting section
-  covering symptoms, root cause, and fix for the exec approval gate introduced in
-  OpenClaw v2026.3.31.
+  covering symptoms, root cause (per-agent vs top-level config), and fix for the exec
+  approval gate introduced in OpenClaw v2026.3.31.
 
 ---
 

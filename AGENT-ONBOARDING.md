@@ -77,20 +77,31 @@ This scaffolding ensures the file structure is in place and agents can see the e
 
 ### OpenClaw Exec Tool Permissions (Required for AI Runner)
 
-OpenClaw v2026.3.31+ enables **exec approvals** by default, requiring manual approval for every shell command. The AI runner and evergreen cycles need unrestricted shell access to function autonomously. Add this to `~/.openclaw/openclaw.json`:
+OpenClaw v2026.3.31+ enables **exec approvals** by default, requiring manual approval for every shell command. The AI runner and evergreen cycles need unrestricted shell access to function autonomously.
+
+**Important:** This must be set **per-agent**, not at the top level. The AI runner spawns embedded agent sessions, and the embedded runtime resolves exec policy from the agent entry (`agents.list[].tools.exec`) — it does not inherit the top-level `tools.exec` config.
+
+Add `tools.exec` to your evergreen agent entry in `~/.openclaw/openclaw.json`:
 
 ```json
 {
-  "tools": {
-    "exec": {
-      "security": "full",
-      "ask": "off"
-    }
+  "agents": {
+    "list": [
+      {
+        "id": "evergreen",
+        "tools": {
+          "exec": {
+            "security": "full",
+            "ask": "off"
+          }
+        }
+      }
+    ]
   }
 }
 ```
 
-Without this, agent sessions will hang waiting for approval during unattended cron execution. See [QUICKSTART.md Step 7](QUICKSTART.md#7-test-one-evergreen) for details and security alternatives.
+Without this, agent sessions will hang waiting for approval during unattended cron execution. This config is only required on agents that run evergreen cycles — if you want the same exec access on other agents (e.g. `main`), add the same `tools.exec` block to those entries too. See [QUICKSTART.md Step 7](QUICKSTART.md#7-test-one-evergreen) for details and security alternatives.
 
 ## Key Files You'll Touch (Runtime)
 
