@@ -27,6 +27,12 @@
 #   EVERGREEN_NOTIFY_TARGET — messaging target for failure alerts (e.g. phone number,
 #                             channel ID). If unset, failure notifications are skipped
 #                             but still logged.
+#   AGENT_WORKSPACE     — agent bootstrap workspace (default: same as OPENCLAW_WORKSPACE).
+#                         Set this when using a lean workspace for the evergreen agent
+#                         (e.g. a directory with symlinks to essential files only).
+#                         The runner uses OPENCLAW_WORKSPACE for file operations (logs,
+#                         backups, evergreen dirs) and AGENT_WORKSPACE for pre-flight
+#                         context estimation. See docs/TROUBLESHOOTING.md for details.
 #
 
 set -euo pipefail
@@ -45,6 +51,7 @@ SESSION_ID="evergreen-${EVERGREEN_NAME}-${DATE}"
 TIMEOUT_SECONDS="${EVERGREEN_TIMEOUT:-1500}"
 EVERGREEN_AGENT="${EVERGREEN_AGENT:-}"
 EVERGREEN_NOTIFY_TARGET="${EVERGREEN_NOTIFY_TARGET:-}"
+AGENT_WORKSPACE="${AGENT_WORKSPACE:-$WORKSPACE}"
 BRIEFING_FILE="$WORKSPACE/evergreens/daily-briefing-${DATE}.md"
 BACKUP_DIR="$WORKSPACE/evergreens/${EVERGREEN_NAME}/.backups"
 EVERGREEN_DIR="$WORKSPACE/evergreens/${EVERGREEN_NAME}"
@@ -257,6 +264,18 @@ Time management:
   before finishing, even if your analysis is incomplete. Mark the cycle as
   "partial" in timing.json status if you could not complete all planned work.
 
+Output budgeting (context management):
+- When running commands that produce verbose output, pipe through head/tail/grep
+  to limit what enters the conversation context.
+- Cap individual command outputs to ~50 lines or ~2000 characters.
+- For status checks, extract only the fields you need (e.g. use --json and jq).
+- For session store checks, count entries rather than dumping full metadata.
+- If you need detailed output for analysis, write it to a temp file and read
+  only the relevant portions.
+- When probing services that return JSON, always wrap parsing in error handling
+  to avoid full Python tracebacks inflating context:
+    python3 -c "import json,sys; ..." 2>&1 | head -5
+
 Be thorough but focused. Prioritise actionable findings over exhaustive data dumps.
 This is an autonomous run — no human is available for clarification.
 PROMPT
@@ -286,6 +305,22 @@ if [[ -d "$AGENT_SESSION_DIR" ]]; then
 fi
 
 # ── Invoke openclaw agent ─────────────────────────────────────────────
+# Pre-flight context budget estimation
+# Uses AGENT_WORKSPACE for bootstrap measurement (lean workspace if configured,
+# otherwise the full workspace).
+BOOTSTRAP_DIR="$AGENT_WORKSPACE"
+PROMPT_CHARS=${#TASK_PROMPT}
+SYSTEM_CHARS=$(cat "$BOOTSTRAP_DIR/AGENTS.md" "$BOOTSTRAP_DIR/SOUL.md" "$BOOTSTRAP_DIR/TOOLS.md" \
+  "$BOOTSTRAP_DIR/IDENTITY.md" "$BOOTSTRAP_DIR/USER.md" "$BOOTSTRAP_DIR/BOOTSTRAP.md" \
+  "$BOOTSTRAP_DIR/MEMORY.md" "$BOOTSTRAP_DIR/ARCHITECTURE.md" 2>/dev/null | wc -c)
+TOTAL_CHARS=$((PROMPT_CHARS + SYSTEM_CHARS))
+ESTIMATED_TOKENS=$((TOTAL_CHARS / 4))
+MAX_INPUT=$((196608 - 65536))  # 131K tokens (196K context minus 65K output reserve)
+log "Context estimate: prompt=${PROMPT_CHARS}c bootstrap=${SYSTEM_CHARS}c total≈${ESTIMATED_TOKENS}t (budget=${MAX_INPUT}t)"
+if [[ "$ESTIMATED_TOKENS" -gt "$((MAX_INPUT * 80 / 100))" ]]; then
+    log "WARN: Estimated prompt (${ESTIMATED_TOKENS} tokens) uses >80% of input budget (${MAX_INPUT} tokens)"
+fi
+
 if [[ -n "$EVERGREEN_AGENT" ]]; then
     log "Session: $SESSION_ID | Agent: $EVERGREEN_AGENT | Timeout: ${TIMEOUT_SECONDS}s"
 else

@@ -13,6 +13,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## 1.2.0
+
+### Added
+- **`AGENT_WORKSPACE` env var support in AI runner** — The runner now supports an
+  `AGENT_WORKSPACE` environment variable (via `OPENCLAW_AGENT_WORKSPACE`) for
+  pre-flight context estimation. When using a lean workspace for the evergreen agent
+  (a directory with symlinks to essential files only), set this variable so the
+  runner estimates token usage against the actual bootstrap files the agent sees,
+  not the full workspace. Falls back to `OPENCLAW_WORKSPACE` if unset.
+
+- **Context Overflow troubleshooting section** — New section in TROUBLESHOOTING.md
+  covering: symptoms, diagnosis, contributing factors (large bootstrap, verbose tool
+  output, retry mechanism, compaction limitations), and solutions (lean workspace
+  pattern, output budgeting, pre-flight estimation).
+
+- **OpenClaw Configuration Gotchas section** — New section in TROUBLESHOOTING.md
+  documenting known OpenClaw behaviors that can cause subtle failures:
+  - `models.json` silent re-corruption after gateway restarts or version mismatches
+  - `agents.list` requiring array index notation (not name-based)
+  - Per-agent bootstrap overrides not supported by the schema
+  - Compaction structurally blocked for single-turn, tool-heavy sessions
+
+- **Lean workspace maintenance guidance** — Documents the symlink maintenance
+  requirement when using a separate lean workspace for evergreen agents.
+
+---
+
 ## 1.1.0 — 2026-04-01
 
 ### Fixed

@@ -10,6 +10,8 @@
 - [Memory System — Ollama / Embedding Issues](#memory-system--ollama--embedding-issues)
 - [Evergreen Execution Issues](#evergreen-execution-issues)
 - [AI Runner Issues](#ai-runner-issues)
+- [Context Overflow Issues](#context-overflow-issues)
+- [OpenClaw Configuration Gotchas](#openclaw-configuration-gotchas)
 
 ---
 
@@ -782,6 +784,177 @@ tail -20 logs/evergreen-*-$(date +%Y%m%d).log | grep -i dashboard
    The dashboard is updated automatically by `evergreen-ai-runner.sh` after each
    successful cycle. Check the runner script for the "Update dashboard" section.
    If the step is missing, add it after the post-run validation block.
+
+---
+
+## Context Overflow Issues
+
+### Agent Fails with "prompt too long" or "exceeded max context length"
+
+**Symptoms:**
+- Log shows `400 Bad Request: prompt too long; exceeded max context length by N tokens`
+- Session starts normally but fails partway through the cycle (usually during the writing phase)
+- Validation fails and rollback restores from backup
+- Other evergreens on the same schedule complete successfully
+
+**Cause:** The total conversation (system prompt + task prompt + accumulated tool call messages + retry prompts) exceeded the model's maximum context length. This is a **fragile-margin failure** — a successful run on Day 1 can fail on Day 2 if there's slightly more data (e.g., extra orphan sessions, an unexpected error traceback in tool output).
+
+**Contributing factors:**
+1. **Large bootstrap files** — AGENTS.md, SOUL.md, TOOLS.md, skills catalog, etc. consume context before the agent begins work
+2. **Verbose tool output** — commands like `openclaw status`, session dumps, and service probes produce kilobytes of output that accumulates in the conversation
+3. **Retry mechanism** — when the model times out, OpenClaw appends "Continue where you left off" as a new message without trimming older content
+4. **Compaction cannot rescue tool-heavy sessions** — see [Compaction limitations](#compaction-is-blocked-for-tool-heavy-sessions) below
+
+**Diagnosis:**
+
+```bash
+# Check the pre-flight context estimation in the log
+grep -i "estimated\|budget\|tokens\|context" logs/evergreen-<name>-$(date +%Y%m%d).log
+
+# Calculate bootstrap size manually
+BOOTSTRAP_DIR="${AGENT_WORKSPACE:-$WORKSPACE}"
+cat "$BOOTSTRAP_DIR"/AGENTS.md "$BOOTSTRAP_DIR"/SOUL.md "$BOOTSTRAP_DIR"/TOOLS.md \
+    "$BOOTSTRAP_DIR"/IDENTITY.md "$BOOTSTRAP_DIR"/USER.md "$BOOTSTRAP_DIR"/BOOTSTRAP.md \
+    "$BOOTSTRAP_DIR"/MEMORY.md "$BOOTSTRAP_DIR"/ARCHITECTURE.md 2>/dev/null | wc -c
+# Divide by 4 for rough token estimate
+```
+
+**Solutions:**
+
+1. **Use a lean workspace (recommended):**
+   Create a separate workspace directory for the evergreen agent with symlinks to only the files it needs, excluding large files like HEARTBEAT.md:
+   ```bash
+   mkdir -p ~/.openclaw/workspace-evergreen
+   cd ~/.openclaw/workspace-evergreen
+
+   # Symlink essential files
+   for f in SOUL.md USER.md MEMORY.md IDENTITY.md BOOTSTRAP.md TOOLS.md ARCHITECTURE.md; do
+     ln -sf "../workspace/$f" "$f"
+   done
+
+   # Symlink directories
+   for d in evergreens scripts skills logs; do
+     ln -sf "../workspace/$d" "$d"
+   done
+
+   # Create a trimmed AGENTS.md (remove main-agent-specific sections)
+   # Copy and manually edit to keep only evergreen-relevant instructions
+   cp ../workspace/AGENTS.md AGENTS.md
+   # Edit to remove sections not relevant to automated cron cycles
+   ```
+
+   Then set the agent's workspace:
+   ```bash
+   openclaw config set 'agents.list[<INDEX>].workspace' '"workspace-evergreen"' --strict-json
+   ```
+
+   And set `AGENT_WORKSPACE` in the runner to point pre-flight estimation at the lean workspace:
+   ```bash
+   export AGENT_WORKSPACE="$HOME/.openclaw/workspace-evergreen"
+   ```
+
+2. **Enable output budgeting in the task prompt:**
+   The runner's `TASK_PROMPT` should include output-limiting instructions:
+   ```
+   Output budgeting:
+   - Pipe verbose commands through head/tail/grep to limit output
+   - Cap individual command outputs to ~50 lines or ~2000 characters
+   - Count entries rather than dumping full metadata
+   - Write detailed output to temp files and read only relevant portions
+   ```
+
+3. **Verify contextPruning is active:**
+   ```bash
+   openclaw config get contextPruning
+   ```
+   Note: cache-TTL pruning helps multi-turn sessions but does not rescue single-turn sessions that overflow on first call. See [Compaction limitations](#compaction-is-blocked-for-tool-heavy-sessions).
+
+4. **Use a model with a larger context window** if available.
+
+---
+
+### Lean Workspace Requires Manual Symlink Maintenance
+
+If you use a lean workspace (separate directory with symlinks to the main workspace), new files added to the main workspace **will not automatically appear** in the lean workspace.
+
+**Periodic check:**
+```bash
+diff <(ls ~/.openclaw/workspace/*.md | xargs -n1 basename | sort) \
+     <(ls ~/.openclaw/workspace-evergreen/*.md 2>/dev/null | xargs -n1 basename | sort)
+```
+
+Add symlinks for any new files the evergreen agent needs.
+
+---
+
+## OpenClaw Configuration Gotchas
+
+### `models.json` Can Be Silently Re-Emptied
+
+**Symptoms:** A model that was previously registered shows as "Unknown model" in logs. The run falls back to a secondary model or fails outright.
+
+**Cause:** Certain operations (gateway restarts, config syncs, version mismatches between binaries) can trigger model registry rewrites that empty provider model arrays.
+
+**Check:**
+```bash
+# Verify model entries exist
+jq '.providers["<provider>"].models | length' ~/.openclaw/agents/*/agent/models.json
+# Should return a non-zero number for each agent
+```
+
+**Fix:**
+```bash
+openclaw models sync --provider <provider>
+# Or manually re-register:
+openclaw models add <provider>/<model>
+```
+
+**Prevention:** After OpenClaw upgrades or gateway restarts, verify model registrations. Keep a backup of working `models.json` files.
+
+---
+
+### Agent Config Requires Array Index Notation
+
+The `agents.list` config is a JSON array, not a map. You must use numeric indices:
+
+```bash
+# Correct — use the numeric index:
+openclaw config set 'agents.list[1].workspace' '"workspace-evergreen"' --strict-json
+
+# Wrong — fails with "Expected numeric index for array segment":
+openclaw config set agents.list.evergreen.workspace workspace-evergreen
+```
+
+Find the index of an agent:
+```bash
+openclaw config get agents.list | jq 'to_entries[] | select(.value.name == "evergreen") | .key'
+```
+
+> **Caution:** If agent ordering changes (e.g., an agent is removed and re-added), indices shift. Always verify the index before making config changes.
+
+---
+
+### Per-Agent Bootstrap Overrides Are Not Supported
+
+The OpenClaw schema only supports bootstrap settings at the `agents.defaults` level:
+- `bootstrapMaxChars` (per-file limit) — defaults level only
+- `bootstrapTotalMaxChars` (total budget) — defaults level only
+- No per-agent overrides (e.g., `agents.list[N].bootstrapTotalMaxChars` is rejected by schema validation)
+- No file-level exclusion (no `.openclawignore`, no `bootstrapFiles` whitelist/blacklist)
+
+The **only per-agent control** over bootstrap content is the `workspace` path. This is why a lean workspace is required rather than a simple config change.
+
+---
+
+### Compaction Is Blocked for Tool-Heavy Sessions
+
+Two independent safeguards prevent context recovery in evergreen-style sessions:
+
+1. **Cache-TTL pruning** prunes messages older than the configured TTL (e.g., 30 minutes). In a fresh evergreen session that completes in ~5 minutes, no messages exceed the TTL — nothing to prune.
+
+2. **Compaction** cancels when it detects "no real conversation messages to summarize." Evergreen sessions are dominated by tool calls and tool results with minimal assistant text. The compactor has nothing to summarize.
+
+This means **context overflow in a single-turn, tool-heavy session has no automatic recovery path**. Prevention (lean workspace, output budgeting, pre-flight estimation) is the only defense.
 
 ---
 
