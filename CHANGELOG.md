@@ -13,6 +13,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## 1.2.1
+
+### Fixed
+- **Lean workspace: use hard copies instead of symlinks for bootstrap files** —
+  OpenClaw's bootstrap loader does not follow symlinks when reading workspace `.md`
+  files for system prompt injection. Symlinked bootstrap files (SOUL.md, TOOLS.md,
+  IDENTITY.md, USER.md, BOOTSTRAP.md, MEMORY.md) are treated as `missing` with zero
+  content, causing the agent to run without critical context. Updated documentation to
+  use hard copies for bootstrap `.md` files and symlinks only for directories (which
+  work correctly for exec/read/write tool operations). Replaced the "Lean Workspace
+  Requires Manual Symlink Maintenance" section with a sync script and crontab entry
+  for keeping hard copies up to date.
+
+- **Exec tool blocks long heredoc scripts despite `ask: "off"`** — OpenClaw's exec
+  tool flags long inline heredoc scripts (e.g. multi-hundred-line Python blocks) as
+  "potentially obfuscated" and requires manual approval, even with `security: "full"`
+  and `ask: "off"`. During unattended cron runs this causes a silent failure: the
+  agent completes its session but the blocked write never executes, so validation
+  fails and the run is rolled back. Added a "File-writing strategy" section to the
+  runner's task prompt instructing agents to write files individually rather than
+  combining them into a single large script. Documented this gotcha in the exec
+  approval troubleshooting section.
+
+### Added
+- **Fallback model server pre-flight check** — The AI runner now checks reachability
+  of the fallback model server (defaults to `http://127.0.0.1:11434`, configurable via
+  `OLLAMA_URL`) before each run. Logs a warning if unreachable so operators have
+  visibility into degraded fallback coverage without blocking the run.
+
+---
+
 ## 1.2.0
 
 ### Added

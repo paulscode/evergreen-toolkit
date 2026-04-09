@@ -445,6 +445,8 @@ python3 scripts/preflight-check.py
 
 > **Security alternative:** If unrestricted shell access is a concern, use `"security": "allowlist"` with `"ask": "on-miss"` and pre-populate `~/.openclaw/exec-approvals.json` with commands your evergreens need. This requires more setup but limits the agent to approved commands only.
 
+> **Heredoc / long script gotcha:** Even with `security: "full"` and `ask: "off"`, OpenClaw's exec tool may flag long inline heredoc scripts (e.g. multi-hundred-line `python3 - <<'PY' ...` blocks) as "potentially obfuscated" and require manual approval. During unattended cron runs, this causes a silent failure — the agent completes its session but the write never executes, so validation fails and the run is rolled back. The AI runner's task prompt includes a "File-writing strategy" section that instructs the agent to write files individually rather than combining them into a single large script. If you customise the task prompt, keep this guidance intact.
+
 ---
 
 ### Gateway Health Check Fails
@@ -822,17 +824,20 @@ cat "$BOOTSTRAP_DIR"/AGENTS.md "$BOOTSTRAP_DIR"/SOUL.md "$BOOTSTRAP_DIR"/TOOLS.m
 **Solutions:**
 
 1. **Use a lean workspace (recommended):**
-   Create a separate workspace directory for the evergreen agent with symlinks to only the files it needs, excluding large files like HEARTBEAT.md:
+   Create a separate workspace directory for the evergreen agent with only the files it needs, excluding large files like HEARTBEAT.md.
+
+   > ⚠️ **Important:** OpenClaw's bootstrap loader does **not** follow symlinks when reading workspace `.md` files for the system prompt. Symlinked `.md` files will be treated as `missing` and their content will not be injected. Use **hard copies** for bootstrap files (`.md` files in the workspace root) and symlinks only for **directories** (which work correctly for exec/read/write tool operations).
+
    ```bash
    mkdir -p ~/.openclaw/workspace-evergreen
    cd ~/.openclaw/workspace-evergreen
 
-   # Symlink essential files
+   # Hard-copy bootstrap files (symlinks will NOT work for these)
    for f in SOUL.md USER.md MEMORY.md IDENTITY.md BOOTSTRAP.md TOOLS.md ARCHITECTURE.md; do
-     ln -sf "../workspace/$f" "$f"
+     cp "../workspace/$f" "$f"
    done
 
-   # Symlink directories
+   # Symlink directories (these work correctly)
    for d in evergreens scripts skills logs; do
      ln -sf "../workspace/$d" "$d"
    done
@@ -873,17 +878,46 @@ cat "$BOOTSTRAP_DIR"/AGENTS.md "$BOOTSTRAP_DIR"/SOUL.md "$BOOTSTRAP_DIR"/TOOLS.m
 
 ---
 
-### Lean Workspace Requires Manual Symlink Maintenance
+### Lean Workspace Bootstrap Files Drift from Main Workspace
 
-If you use a lean workspace (separate directory with symlinks to the main workspace), new files added to the main workspace **will not automatically appear** in the lean workspace.
+If you use a lean workspace with hard copies of bootstrap files, the copies will drift when the originals in the main workspace are updated.
 
-**Periodic check:**
+**Sync script (add to your workspace):**
 ```bash
-diff <(ls ~/.openclaw/workspace/*.md | xargs -n1 basename | sort) \
-     <(ls ~/.openclaw/workspace-evergreen/*.md 2>/dev/null | xargs -n1 basename | sort)
+#!/bin/bash
+# sync-lean-workspace.sh — refresh hard copies from main workspace
+set -euo pipefail
+
+MAIN="${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}"
+LEAN="${AGENT_WORKSPACE:-$HOME/.openclaw/workspace-evergreen}"
+
+SYNC_FILES=(SOUL.md TOOLS.md IDENTITY.md USER.md BOOTSTRAP.md MEMORY.md ARCHITECTURE.md)
+
+UPDATED=0
+for f in "${SYNC_FILES[@]}"; do
+    if [[ -f "$MAIN/$f" ]]; then
+        if ! diff -q "$MAIN/$f" "$LEAN/$f" &>/dev/null; then
+            cp "$MAIN/$f" "$LEAN/$f"
+            echo "[sync] Updated: $f"
+            ((UPDATED++))
+        fi
+    fi
+done
+
+if [[ "$UPDATED" -eq 0 ]]; then
+    echo "[sync] Lean workspace already up to date"
+else
+    echo "[sync] Updated $UPDATED file(s)"
+fi
 ```
 
-Add symlinks for any new files the evergreen agent needs.
+**Schedule before your first evergreen run:**
+```bash
+# Example: sync at 3:55 AM, 5 minutes before the first evergreen at 4:00 AM
+55 3 * * * $WORKSPACE/scripts/sync-lean-workspace.sh >> $WORKSPACE/logs/lean-sync.log 2>&1
+```
+
+> **Note:** `AGENTS.md` is intentionally excluded from sync if you maintain a trimmed version for the lean workspace.
 
 ---
 

@@ -186,6 +186,12 @@ if ! "$OPENCLAW" health --timeout 5000 &>/dev/null; then
     log "WARN: Gateway health check failed — will attempt anyway (auto-fallback available)"
 fi
 
+# Check fallback model reachability (Ollama or other local model server)
+FALLBACK_URL="${OLLAMA_URL:-http://127.0.0.1:11434}"
+if ! curl -fsS --connect-timeout 5 "${FALLBACK_URL}/api/tags" >/dev/null 2>&1; then
+    log "WARN: Fallback model server (${FALLBACK_URL}) unreachable — fallback may be unavailable"
+fi
+
 # ── Pre-run backup ─────────────────────────────────────────────────────
 for f in STATE.md AGENDA.md timing.json; do
     SRC="$EVERGREEN_DIR/$f"
@@ -275,6 +281,15 @@ Output budgeting (context management):
 - When probing services that return JSON, always wrap parsing in error handling
   to avoid full Python tracebacks inflating context:
     python3 -c "import json,sys; ..." 2>&1 | head -5
+
+File-writing strategy:
+- Write each output file (AGENDA.md, STATE.md, timing.json, metrics.json,
+  action-log.jsonl) separately using the write tool or short, focused shell
+  commands (one per file).
+- Do NOT combine all file writes into a single long inline Python or bash
+  heredoc script — the exec tool's safety heuristics may flag long heredoc
+  scripts as obfuscated and block execution, which will cause the cycle to
+  fail silently.
 
 Be thorough but focused. Prioritise actionable findings over exhaustive data dumps.
 This is an autonomous run — no human is available for clarification.
