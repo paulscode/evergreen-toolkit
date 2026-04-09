@@ -442,6 +442,8 @@ export EVERGREEN_NOTIFY_TARGET="+1234567890"
 
 Notifications are optional — if `EVERGREEN_NOTIFY_TARGET` is not set or `openclaw message send` is unavailable, the system still runs normally. Errors are always logged to `logs/`.
 
+> **DST zones:** If your timezone observes Daylight Saving Time, avoid scheduling memory jobs in the 2:00–3:00 AM window — the spring-forward transition can cause True Recall and Jarvis to race. See [docs/SCHEDULING.md](docs/SCHEDULING.md#adjust-for-daylight-saving-time) for details.
+
 ---
 
 ## 11. Verify Everything Works

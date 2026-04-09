@@ -257,6 +257,8 @@ All times shown in local time (adjust for your timezone - see [SCHEDULING.md](do
 
 **Critical:** Memory cron jobs (2:30-3:00 AM) MUST run before evergreens. True Recall must run before Jarvis backup (which clears Redis). PARA promotion must run before True Recall on its weekly schedule. See `config/crontab.sample` for correct ordering.
 
+> **DST zones:** If your timezone observes Daylight Saving Time, avoid scheduling memory jobs in the 2:00–3:00 AM window — the spring-forward transition can cause True Recall and Jarvis to race. See [docs/SCHEDULING.md](docs/SCHEDULING.md#adjust-for-daylight-saving-time) for details.
+
 ---
 
 ## 🔧 How It Works

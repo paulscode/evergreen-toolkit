@@ -2,6 +2,8 @@
 
 Sample configuration files for Evergreen Toolkit.
 
+> **Key concept — Two Qdrant collections:** The memory system uses two separate Qdrant collections: one for raw conversation backups (`QDRANT_COLLECTION`, e.g., `myagent-memories`) and one for AI-curated gems (`TRUE_RECALL_COLLECTION`, default: `true_recall`). Both are configured in `.memory_env` — see [MEMORY-SYSTEM.md](../MEMORY-SYSTEM.md) for why they're separate.
+
 ---
 
 ## ❤️ Heartbeat Template (`HEARTBEAT-TEMPLATE.md`)
